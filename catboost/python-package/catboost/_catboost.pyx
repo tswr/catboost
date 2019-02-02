@@ -139,6 +139,7 @@ cdef extern from "catboost/libs/options/enums.h":
 
     cdef EPredictionType EPredictionType_Class "EPredictionType::Class"
     cdef EPredictionType EPredictionType_Probability "EPredictionType::Probability"
+    cdef EPredictionType EPredictionType_LogProbability "EPredictionType::LogProbability"
     cdef EPredictionType EPredictionType_RawFormulaVal "EPredictionType::RawFormulaVal"
 
 
@@ -1035,6 +1036,8 @@ cdef class PyPredictionType:
             self.predictionType = EPredictionType_Class
         elif prediction_type == 'Probability':
             self.predictionType = EPredictionType_Probability
+        elif prediction_type == 'LogProbability':
+            self.predictionType = EPredictionType_LogProbability
         else:
             self.predictionType = EPredictionType_RawFormulaVal
 

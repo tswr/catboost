@@ -1275,6 +1275,7 @@ class CatBoost(_CatBoostBase):
         if loss_function_type is not None and (loss_function_type == 'MultiClass' or loss_function_type == 'MultiClassOneVsAll'):
             return np.transpose(self._base_predict_multi(data, prediction_type, ntree_start, ntree_end, thread_count, verbose))
         predictions = np.array(self._base_predict(data, prediction_type, ntree_start, ntree_end, thread_count, verbose))
+        # TODO: figure this case for LogProbability
         if prediction_type == 'Probability':
             predictions = np.transpose([1 - predictions, predictions])
         return predictions

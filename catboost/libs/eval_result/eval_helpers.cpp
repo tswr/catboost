@@ -13,6 +13,17 @@
 #include <cmath>
 #include <limits>
 
+namespace {
+
+void ApplyLogToAll(TVector<TVector<double>>* matrix) {
+    for (auto& row : *matrix) {
+        for (auto& element : row) {
+            element = log(element);
+        }
+    }
+}
+
+}  // anonymous namespace
 
 void CalcSoftmax(const TConstArrayRef<double> approx, TVector<double>* softmax) {
     double maxApprox = *MaxElement(approx.begin(), approx.end());
@@ -190,7 +201,6 @@ TVector<TVector<double>> PrepareEval(const EPredictionType predictionType,
     return PrepareEval(predictionType, approx, &executor);
 }
 
-
 void PrepareEval(const EPredictionType predictionType,
                  const TVector<TVector<double>>& approx,
                  NPar::TLocalExecutor* executor,
@@ -198,10 +208,14 @@ void PrepareEval(const EPredictionType predictionType,
 
     switch (predictionType) {
         case EPredictionType::Probability:
+        case EPredictionType::LogProbability:
             if (IsMulticlass(approx)) {
                 *result = CalcSoftmax(approx, executor);
             } else {
                 *result = {CalcSigmoid(approx[0])};
+            }
+            if (predictionType == EPredictionType::LogProbability) {
+                ApplyLogToAll(result);
             }
             break;
         case EPredictionType::Class:
