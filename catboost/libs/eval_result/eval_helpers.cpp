@@ -13,18 +13,6 @@
 #include <cmath>
 #include <limits>
 
-namespace {
-
-void ApplyLogToAll(TVector<TVector<double>>* matrix) {
-    for (auto& row : *matrix) {
-        for (auto& element : row) {
-            element = log(element);
-        }
-    }
-}
-
-}  // anonymous namespace
-
 void CalcSoftmax(const TConstArrayRef<double> approx, TVector<double>* softmax) {
     double maxApprox = *MaxElement(approx.begin(), approx.end());
     for (size_t dim = 0; dim < approx.size(); ++dim) {
@@ -40,11 +28,36 @@ void CalcSoftmax(const TConstArrayRef<double> approx, TVector<double>* softmax) 
     }
 }
 
+void CalcLogSoftmax(const TConstArrayRef<double> approx, TVector<double>* softmax) {
+    double maxApprox = *MaxElement(approx.begin(), approx.end());
+    for (size_t dim = 0; dim < approx.size(); ++dim) {
+        (*softmax)[dim] = approx[dim] - maxApprox;
+    }
+    FastExpInplace(softmax->data(), softmax->ysize());
+    double sumExpApprox = 0;
+    for (auto curSoftmax : *softmax) {
+        sumExpApprox += curSoftmax;
+    }
+    const double logSumExpApprox = log(sumExpApprox);
+    for (size_t dim = 0; dim < approx.size(); ++dim) {
+        (*softmax)[dim] = approx[dim] - maxApprox - logSumExpApprox;
+    }
+}
+
 TVector<double> CalcSigmoid(const TConstArrayRef<double> approx) {
     TVector<double> probabilities;
     probabilities.yresize(approx.size());
     for (size_t i = 0; i < approx.size(); ++i) {
         probabilities[i] = 1. / (1. + exp(-approx[i]));
+    }
+    return probabilities;
+}
+
+TVector<double> CalcLogSigmoid(const TConstArrayRef<double> approx) {
+    TVector<double> probabilities;
+    probabilities.yresize(approx.size());
+    for (size_t i = 0; i < approx.size(); ++i) {
+        probabilities[i] = -log(1. + exp(-approx[i]));
     }
     return probabilities;
 }
@@ -70,6 +83,40 @@ static TVector<TVector<double>> CalcSoftmax(
                 line[dim] = approx[dim][lineInd];
             }
             CalcSoftmax(line, &softmax);
+            for (int dim = 0; dim < approx.ysize(); ++dim) {
+                probabilities[dim][lineInd] = softmax[dim];
+            }
+        }
+    };
+    if (executor) {
+        executor->ExecRange(calcSoftmaxInBlock, 0, threadCount, NPar::TLocalExecutor::WAIT_COMPLETE);
+    } else {
+        calcSoftmaxInBlock(0);
+    }
+    return probabilities;
+}
+
+static TVector<TVector<double>> CalcLogSoftmax(
+    const TVector<TVector<double>>& approx,
+    NPar::TLocalExecutor* executor)
+{
+    TVector<TVector<double>> probabilities = approx;
+    probabilities.resize(approx.size());
+    ForEach(probabilities.begin(), probabilities.end(), [&](auto& v) { v.yresize(approx.front().size()); });
+    const int executorThreadCount = executor ? executor->GetThreadCount() : 0;
+    const int threadCount = executorThreadCount + 1;
+    const int blockSize = (approx[0].ysize() + threadCount - 1) / threadCount;
+    const auto calcSoftmaxInBlock = [&](const int blockId) {
+        int lastLineId = Min((blockId + 1) * blockSize, approx[0].ysize());
+        TVector<double> line;
+        line.yresize(approx.size());
+        TVector<double> softmax;
+        softmax.yresize(approx.size());
+        for (int lineInd = blockId * blockSize; lineInd < lastLineId; ++lineInd) {
+            for (int dim = 0; dim < approx.ysize(); ++dim) {
+                line[dim] = approx[dim][lineInd];
+            }
+            CalcLogSoftmax(line, &softmax);
             for (int dim = 0; dim < approx.ysize(); ++dim) {
                 probabilities[dim][lineInd] = softmax[dim];
             }
@@ -208,15 +255,19 @@ void PrepareEval(const EPredictionType predictionType,
 
     switch (predictionType) {
         case EPredictionType::Probability:
-        case EPredictionType::LogProbability:
             if (IsMulticlass(approx)) {
                 *result = CalcSoftmax(approx, executor);
             } else {
                 *result = {CalcSigmoid(approx[0])};
             }
-            if (predictionType == EPredictionType::LogProbability) {
-                ApplyLogToAll(result);
+            break;
+        case EPredictionType::LogProbability:
+            if (IsMulticlass(approx)) {
+                *result = CalcLogSoftmax(approx, executor);
+            } else {
+                *result = {CalcLogSigmoid(approx[0])};
             }
+            //ApplyLogToAll(result);
             break;
         case EPredictionType::Class:
             result->resize(1);

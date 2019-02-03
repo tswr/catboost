@@ -11,8 +11,10 @@
 
 
 void CalcSoftmax(TConstArrayRef<double> approx, TVector<double>* softmax);
+void CalcLogSoftmax(TConstArrayRef<double> approx, TVector<double>* softmax);
 
 TVector<double> CalcSigmoid(TConstArrayRef<double> approx);
+TVector<double> CalcLogSigmoid(const TConstArrayRef<double> approx);
 
 TVector<TVector<double>> PrepareEvalForInternalApprox(
     const EPredictionType prediction_type,
