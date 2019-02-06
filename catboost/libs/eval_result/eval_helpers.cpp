@@ -53,11 +53,29 @@ TVector<double> CalcSigmoid(const TConstArrayRef<double> approx) {
     return probabilities;
 }
 
+TVector<double> CalcNegativeSigmoid(TConstArrayRef<double> approx) {
+    TVector<double> probabilities;
+    probabilities.yresize(approx.size());
+    for (size_t i = 0; i < approx.size(); ++i) {
+        probabilities[i] = 1. / (1. + exp(approx[i]));
+    }
+    return probabilities;
+}
+
 TVector<double> CalcLogSigmoid(const TConstArrayRef<double> approx) {
     TVector<double> probabilities;
     probabilities.yresize(approx.size());
     for (size_t i = 0; i < approx.size(); ++i) {
         probabilities[i] = -log(1. + exp(-approx[i]));
+    }
+    return probabilities;
+}
+
+TVector<double> CalcNegativeLogSigmoid(const TConstArrayRef<double> approx) {
+    TVector<double> probabilities;
+    probabilities.yresize(approx.size());
+    for (size_t i = 0; i < approx.size(); ++i) {
+        probabilities[i] = -log(1. + exp(approx[i]));
     }
     return probabilities;
 }
@@ -258,16 +276,15 @@ void PrepareEval(const EPredictionType predictionType,
             if (IsMulticlass(approx)) {
                 *result = CalcSoftmax(approx, executor);
             } else {
-                *result = {CalcSigmoid(approx[0])};
+                *result = {CalcNegativeSigmoid(approx[0]), CalcSigmoid(approx[0])};
             }
             break;
         case EPredictionType::LogProbability:
             if (IsMulticlass(approx)) {
                 *result = CalcLogSoftmax(approx, executor);
             } else {
-                *result = {CalcLogSigmoid(approx[0])};
+                *result = {CalcNegativeLogSigmoid(approx[0]), CalcLogSigmoid(approx[0])};
             }
-            //ApplyLogToAll(result);
             break;
         case EPredictionType::Class:
             result->resize(1);

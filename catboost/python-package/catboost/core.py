@@ -1272,13 +1272,18 @@ class CatBoost(_CatBoostBase):
         if loss_function_type is None:
             loss_function_type = self.get_param('objective')
         # TODO(kirillovs): very bad solution. user should be able to use custom multiclass losses
-        if loss_function_type is not None and (loss_function_type == 'MultiClass' or loss_function_type == 'MultiClassOneVsAll'):
-            return np.transpose(self._base_predict_multi(data, prediction_type, ntree_start, ntree_end, thread_count, verbose))
-        predictions = np.array(self._base_predict(data, prediction_type, ntree_start, ntree_end, thread_count, verbose))
+        #if loss_function_type is not None and (loss_function_type == 'MultiClass' or loss_function_type == 'MultiClassOneVsAll'):
+        pred_multi = np.transpose(self._base_predict_multi(data, prediction_type, ntree_start, ntree_end, thread_count, verbose))
+        pred = np.array(self._base_predict(data, prediction_type, ntree_start, ntree_end, thread_count, verbose))
+        pred = np.transpose([1 - pred, pred])
+        with open('/tmp/pred_multi.txt', 'w') as f:
+            print >> f, '_predict multi:', pred_multi
+        with open('/tmp/pred.txt', 'w') as f:
+            print >> f, '_predict:', pred
         # TODO: figure this case for LogProbability
-        if prediction_type == 'Probability':
-            predictions = np.transpose([1 - predictions, predictions])
-        return predictions
+        #if prediction_type == 'Probability':
+        #    predictions = np.transpose([1 - predictions, predictions])
+        return pred_multi
 
     def predict(self, data, prediction_type='RawFormulaVal', ntree_start=0, ntree_end=0, thread_count=-1, verbose=None):
         """
